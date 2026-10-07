@@ -47,7 +47,6 @@ jobs:
                   names = {m.name.removeprefix("./").rstrip("/") for m in members}
                   assert "x-ui/x-ui" in names, (path, "missing binary")
                   assert "x-ui/x-ui.service" in names, (path, "missing service")
-                  assert "x-ui/x-ui.sh" in names, (path, "missing management script")
                   assert any(n.startswith("x-ui/bin/xray-linux-") for n in names), (path, "missing xray")
                   for member in members:
                       stream = src.extractfile(member) if member.isfile() else None
@@ -63,6 +62,12 @@ jobs:
                           member.size = len(data)
                           stream = io.BytesIO(data)
                       dst.addfile(member, stream)
+                  if "x-ui/x-ui.sh" not in names:
+                      data = script.encode()
+                      member = tarfile.TarInfo("x-ui/x-ui.sh")
+                      member.size = len(data)
+                      member.mode = 0o755
+                      dst.addfile(member, io.BytesIO(data))
               with tarfile.open(pathlib.Path("packages") / path.name) as archive:
                   for member in archive.getmembers():
                       if member.isfile() and member.name.endswith(".sh"):
