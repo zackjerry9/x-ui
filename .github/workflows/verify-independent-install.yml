@@ -1,0 +1,83 @@
+name: Verify independent installation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - x-ui.sh
+      - .github/workflows/verify-independent-install.yml
+permissions:
+  contents: read
+jobs:
+  install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify release checksums and bundled scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir packages
+          gh release download 0.3.4.4 --repo "$TARGET_REPO" --dir packages
+          (cd packages && sha256sum -c SHA256SUMS)
+          for package in packages/*.tar.gz; do
+            tar -xOf "$package" x-ui/x-ui.sh | bash -n
+            if tar -xOf "$package" x-ui/x-ui.sh | grep -q 'FranzKafkaYu/x-ui'; then
+              echo "Upstream reference found in $package"
+              exit 1
+            fi
+          done
+      - name: Install and update using this repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS "https://raw.githubusercontent.com/$TARGET_REPO/main/install.sh" -o install.sh
+          curl -fLsS "https://raw.githubusercontent.com/$TARGET_REPO/main/x-ui.sh" -o x-ui.sh
+          bash -n install.sh
+          bash -n x-ui.sh
+          if grep -n 'FranzKafkaYu/x-ui' install.sh x-ui.sh; then exit 1; fi
+          mkdir wrappers
+          cat > wrappers/curl <<'SH'
+          #!/bin/bash
+          for arg in "$@"; do
+            case "$arg" in
+              *FranzKafkaYu/x-ui*) echo "Forbidden upstream dependency" >&2; exit 98 ;;
+            esac
+          done
+          exec "/usr/bin/${0##*/}" "$@"
+          SH
+          cp wrappers/curl wrappers/wget
+          chmod +x wrappers/*
+          sudo env PATH="$PWD/wrappers:$PATH" bash -c 'bash <(curl -fLsS https://raw.githubusercontent.com/zackjerry9/x-ui/main/install.sh)' <<< n > install.log 2>&1
+          for attempt in $(seq 1 15); do
+            sudo systemctl is-active --quiet x-ui && break
+            sleep 2
+          done
+          sudo systemctl is-active --quiet x-ui
+          test -x /usr/bin/x-ui
+          test -x /usr/local/x-ui/x-ui
+          test -x /usr/local/x-ui/x-ui.sh
+          sudo ss -lntp | grep '"x-ui"'
+          if grep -n 'FranzKafkaYu/x-ui' /usr/bin/x-ui /usr/local/x-ui/x-ui.sh; then exit 1; fi
+          sudo env PATH="$PWD/wrappers:$PATH" bash /usr/bin/x-ui update <<< $'y\nn\n' > update.log 2>&1
+          for attempt in $(seq 1 15); do
+            sudo systemctl is-active --quiet x-ui && break
+            sleep 2
+          done
+          sudo systemctl is-active --quiet x-ui
+          sudo ss -lntp | grep '"x-ui"'
+          echo "Fresh installation and management-menu update passed."
+      - name: Report failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          sudo systemctl status x-ui --no-pager || true
+          sudo journalctl -u x-ui --no-pager -n 30 || true
+          grep -Ei 'error|failed|404|403|失败|错误' install.log update.log 2>/dev/null || true
+      - name: Stop temporary service
+        if: always()
+        run: sudo systemctl stop x-ui || true
