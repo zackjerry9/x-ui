@@ -1,0 +1,89 @@
+name: Import standalone release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/import-standalone-release.yml]
+permissions:
+  contents: write
+concurrency:
+  group: import-standalone-release
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_REPO: ${{ github.repository }}
+      SOURCE_REPO: FranzKafkaYu/x-ui
+      VERSION: 0.3.4.4
+    steps:
+      - name: Download and validate upstream archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$TARGET_REPO" = "zackjerry9/x-ui"
+          mkdir source packages
+          gh release download "$VERSION" --repo "$SOURCE_REPO" --pattern 'x-ui-linux-*.tar.gz' --dir source
+          test "$(find source -name '*.tar.gz' | wc -l)" -eq 6
+          (cd source && sha256sum *.tar.gz) > packages/UPSTREAM-SHA256SUMS
+          curl -fLsS --retry 3 "https://raw.githubusercontent.com/$TARGET_REPO/main/x-ui.sh" -o management.sh
+          python3 - <<'PY'
+          import io
+          import os
+          import pathlib
+          import subprocess
+          import tarfile
+          repo = os.environ["TARGET_REPO"]
+          script = pathlib.Path("management.sh").read_text()
+          script = script.replace("FranzKafkaYu/x-ui", repo)
+          script = script.replace(repo + "/master/", repo + "/main/")
+          script = script.replace(repo + "/raw/master/", repo + "/raw/main/")
+          pathlib.Path("management.sh").write_text(script)
+          subprocess.run(["bash", "-n", "management.sh"], check=True)
+          for path in sorted(pathlib.Path("source").glob("*.tar.gz")):
+              with tarfile.open(path, "r:gz") as src, tarfile.open(pathlib.Path("packages") / path.name, "w:gz") as dst:
+                  members = src.getmembers()
+                  names = {m.name.removeprefix("./").rstrip("/") for m in members}
+                  assert "x-ui/x-ui" in names, (path, "missing binary")
+                  assert "x-ui/x-ui.service" in names, (path, "missing service")
+                  assert "x-ui/x-ui.sh" in names, (path, "missing management script")
+                  assert any(n.startswith("x-ui/bin/xray-linux-") for n in names), (path, "missing xray")
+                  for member in members:
+                      stream = src.extractfile(member) if member.isfile() else None
+                      if member.name.removeprefix("./") == "x-ui/x-ui.sh":
+                          data = script.encode()
+                          member.size = len(data)
+                          member.mode = 0o755
+                          stream = io.BytesIO(data)
+                      elif stream is not None and member.name.endswith(".sh"):
+                          data = stream.read().replace(b"FranzKafkaYu/x-ui", repo.encode())
+                          data = data.replace((repo + "/master/").encode(), (repo + "/main/").encode())
+                          data = data.replace((repo + "/raw/master/").encode(), (repo + "/raw/main/").encode())
+                          member.size = len(data)
+                          stream = io.BytesIO(data)
+                      dst.addfile(member, stream)
+              with tarfile.open(pathlib.Path("packages") / path.name) as archive:
+                  for member in archive.getmembers():
+                      if member.isfile() and member.name.endswith(".sh"):
+                          data = archive.extractfile(member).read()
+                          assert b"FranzKafkaYu/x-ui" not in data, (path, member.name)
+                          subprocess.run(["bash", "-n"], input=data, check=True)
+              print("Validated", path.name)
+          PY
+          (cd packages && sha256sum *.tar.gz) > packages/SHA256SUMS
+      - name: Publish independent release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION" --repo "$TARGET_REPO" --json isDraft >/tmp/release.json 2>/dev/null; then
+            test "$(jq -r .isDraft /tmp/release.json)" = true || {
+              echo "Published release already exists; refusing to overwrite its assets."
+              exit 1
+            }
+          else
+            printf '%s\n' 'Standalone archive of upstream version 0.3.4.4.' 'Original binaries are retained; bundled shell scripts use this repository.' 'SHA256SUMS verifies these packages; UPSTREAM-SHA256SUMS records source archive hashes.' 'Runtime installation and panel updates do not require FranzKafkaYu/x-ui.' > release-notes.txt
+            gh release create "$VERSION" --repo "$TARGET_REPO" --target "$GITHUB_SHA" --title "0.3.4.4 standalone" --notes-file release-notes.txt --draft
+          fi
+          gh release upload "$VERSION" packages/* --repo "$TARGET_REPO" --clobber
+          gh release edit "$VERSION" --repo "$TARGET_REPO" --draft=false --latest
