@@ -1,4 +1,6 @@
 # X-UI
+
+> 独立安装归档：安装、面板更新和管理脚本均使用 `zackjerry9/x-ui`，安装包保存在本仓库 Releases（`0.3.4.4`）。首次归档后，安装无需访问 `FranzKafkaYu/x-ui`；系统软件源和可选的 geo、证书、BBR 功能仍使用其各自的外部服务。归档保留原版二进制，并将包内管理脚本地址改为本仓库。校验文件见 Releases 的 `SHA256SUMS`。
 简体中文|[ENGLISH](./README_EN.md)  
 
 > 声明：该项目仅供个人学习、交流，请遵守当地法律法规,勿用于非法用途;请勿用于生产环境  
@@ -39,15 +41,15 @@
 &#x26A1;从原版升级也可使用该命令，数据不会丢失&#x26A1;
 
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/FranzKafkaYu/x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/zackjerry9/x-ui/main/install.sh)
 ```    
 For English Users,please use the following command to install English supported version:  
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/FranzKafkaYu/x-ui/master/install_en.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/zackjerry9/x-ui/main/install_en.sh)
 ```
 如需安装指定的版本,可以在上述命令中指定版本号,如指定版本为`0.3.4.4`,安装命令如下：    
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/FranzKafkaYu/x-ui/master/install.sh) 0.3.4.4   
+bash <(curl -Ls https://raw.githubusercontent.com/zackjerry9/x-ui/main/install.sh) 0.3.4.4   
 ```
 
 # 效果预览  
