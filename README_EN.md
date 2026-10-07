@@ -1,5 +1,7 @@
 # X-UI
 
+> Independent installation archive: installation, panel updates, and management scripts use `zackjerry9/x-ui` and its Releases (`0.3.4.4`). After the initial import, installation does not require `FranzKafkaYu/x-ui`. OS package repositories and optional geo, certificate, and BBR services remain external. Original binaries are retained; bundled management scripts point to this repository. Release checksums are provided in `SHA256SUMS`.
+
 [简体中文](./README.md)| ENGLISH  
 X-UI is a webUI panel based on Xray-core which supports multi protocols and multi users  
 This project is a fork of [vaxilu&#39;s project](https://github.com/vaxilu/x-ui),and it is a experiental project which used by myself for learning golang   
@@ -47,11 +49,11 @@ for more detailed usages,plz see [WIKI](https://github.com/FranzKafkaYu/x-ui/wik
 Make sure your system `bash` and `curl` and `network` are ready,here we go
 
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/FranzKafkaYu/x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/zackjerry9/x-ui/main/install.sh)
 ```  
 For English Users,please use the following command to install English supported version:  
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/FranzKafkaYu/x-ui/master/install_en.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/zackjerry9/x-ui/main/install_en.sh)
 ``` 
 
 ## Shortcut  
